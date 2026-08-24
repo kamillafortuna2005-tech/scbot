@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from yt_dlp import YoutubeDL 
@@ -10,11 +11,12 @@ dp = Dispatcher()
 async def start_cmd(message: types.Message) :
      await message.answer("ghbdtn jnghfdm vyt ccskre yf nhtr cfeylrkfel b z crfxf. tuj")
 @dp.message()
-async def download_soundcloud(message: types.Message):
-        url = message.text
-        if "soundcloud.com" not in url:
-            await message.answer("лсщшуцйлфвысщйФ]") 
-            return
+    match = re.search(r'(https?://(?:on\.)?soundcloud\.com/[^\s]+)', message.text)
+    if not match:
+        await message.answer("Пожалуйста, отправьте корректную ссылку на SoundCloud.")
+        return
+    url = match.group(0)
+    url = re.sub(r'[а-яА-Я]+$', '', url)
         status_message = await message.answer("akz улю")
         ydl_opts = {'format': 'bestaudio/best',
                     'outtmlp': 'track.%(ext)s',
