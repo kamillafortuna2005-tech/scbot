@@ -29,17 +29,17 @@ async def download_soundcloud(message: types.Message):
                     }],
                     'quiet' : True
                      }
-        try:
-            loop = asyncio.get_event_loop()
-            with YoutubeDL(ydl_opts) as ydl:
-                await loop.run_in_executor(None, lambda:ydl.download([url]))
-                file_path = "track.mp3"
-                if os.path.exists(file_path):
-                    await status_message.edit_text("nhtr crfxfy")
-                    audio_file = types.FSInputFile(file_path)
-                    await message.answer_audio(audio=audio_file)
-                    os.remove(file_path)
-                    await status_message.delete()
+     try:
+         loop = asyncio.get_event_loop()
+         with YoutubeDL(ydl_opts) as ydl:
+               await loop.run_in_executor(None, lambda:ydl.download([url]))
+               file_path = "track.mp3"
+               if os.path.exists(file_path):
+                   await status_message.edit_text("nhtr crfxfy")
+                   audio_file = types.FSInputFile(file_path)
+                   await message.answer_audio(audio=audio_file)
+                   os.remove(file_path)
+          await status_message.delete()
                 else:
                     await status_message.edit_text("❌ Ошибка: не удалось сохранить аудиофайл.")
         except Exception as e:
