@@ -1,2 +1,2 @@
-aoiogram
+aiogram
 yt-dlp
