@@ -11,6 +11,7 @@ dp = Dispatcher()
 async def start_cmd(message: types.Message) :
      await message.answer("ghbdtn jnghfdm vyt ccskre yf nhtr cfeylrkfel b z crfxf. tuj")
 @dp.message()
+async def download_soundcloud(message: types.Message):
     match = re.search(r'(https?://(?:on\.)?soundcloud\.com/[^\s]+)', message.text)
     if not match:
         await message.answer("Пожалуйста, отправьте корректную ссылку на SoundCloud.")
