@@ -18,8 +18,8 @@ async def download_soundcloud(message: types.Message):
         return
     url = match.group(0)
     url = re.sub(r'[а-яА-Я]+$', '', url)
-        status_message = await message.answer("akz улю")
-        ydl_opts = {'format': 'bestaudio/best',
+    status_message = await message.answer("akz улю")
+    ydl_opts = {'format': 'bestaudio/best',
                     'outtmlp': 'track.%(ext)s',
                     'postprocessors':[{
                         'key': 'FFmpegExtractAudio',
