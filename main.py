@@ -33,7 +33,7 @@ async def download_soundcloud(message: types.Message):
     try:
         loop = asyncio.get_event_loop()
         with YoutubeDL(ydl_opts) as ydl:
-            info = await loop.run_forever_executor(None, lambda: ydl.extract_info(url, download=False))
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
             title = info.get('title', 'Unknown Track')
             uploader = info.get ('uploader', 'Unknown Artist')
 
