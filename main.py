@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart
 from yt_dlp import YoutubeDL
 
 TOKEN = "8867316822:AAFaa_bFHywtu1UqRwCTGHoK78ljlr-Kfrg"
-CHANNEL_ID = "@percshawty"  # Юзернейм твоего паблика
+CHANNEL_ID = "@musicCEO228"  # Юзернейм твоего паблика
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
