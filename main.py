@@ -71,53 +71,63 @@ async def download_soundcloud(message: types.Message):
         print(f"Ошибка при обработке: {e}")
         await status_message.edit_text("❌ Произошла ошибка при обработке ссылки.")
 
-# Выносим логику скачивания и отправки одного трека в отдельную удобную функцию
+# Логика скачивания и отправки одного конкретного трека
 async def download_and_send_single_track(url, loop):
     ydl_opts = {
         'format': 'bestaudio/best',
         'quiet': True
     }
     
-    # 1. Получаем инфо о конкретном треке
-    with YoutubeDL(ydl_opts) as ydl:
-        info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
-        title = info.get('title', 'Unknown Track')
-        uploader = info.get('uploader', 'Unknown Artist')
+    try:
+        # 1. Получаем инфо о конкретном треке
+        with YoutubeDL(ydl_opts) as ydl:
+            info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
+            title = info.get('title', 'Unknown Track')
+            uploader = info.get('uploader', 'Unknown Artist')
 
-    # 2. Формируем имя файла
-    clean_title = re.sub(r'[\\/*?:"<>|]', "", f"{uploader} - {title}")
-    
-    download_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': f"{clean_title}.%(ext)s",
-        'quiet': True
-    }
-
-    # 3. Скачиваем
-    with YoutubeDL(download_opts) as ydl:
-        await loop.run_in_executor(None, lambda: ydl.download([url]))
-    
-    # 4. Ищем скачанный файл с любым расширением
-    found_file = None
-    for ext in ['mp3', 'm4a', 'ogg', 'opus', 'wav']:
-        test_path = f"{clean_title}.{ext}"
-        if os.path.exists(test_path):
-            found_file = test_path
-            break
-
-    # 5. Если нашли — переименовываем в mp3, шлем в канал и удаляем с сервера
-    if found_file:
-        final_mp3 = f"{clean_title}.mp3"
-        if found_file != final_mp3:
-            os.rename(found_file, final_mp3)
-            
-        audio_file = types.FSInputFile(final_mp3)
+        # 2. Формируем имя файла
+        clean_title = re.sub(r'[\\/*?:"<>|]', "", f"{uploader} - {title}")
         
-        # Отправляем аудиофайл прямо в канал
-        await bot.send_audio(
-            chat_id=CHANNEL_ID,
-            audio=audio_file, 
-            title=title, 
-            performer=uploader
-        )
-        os.remove(final_mp3)
+        download_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': f"{clean_title}.%(ext)s",
+            'quiet': True
+        }
+
+        # 3. Скачиваем
+        with YoutubeDL(download_opts) as ydl:
+            await loop.run_in_executor(None, lambda: ydl.download([url]))
+        
+        # 4. Ищем скачанный файл с любым расширением
+        found_file = None
+        for ext in ['mp3', 'm4a', 'ogg', 'opus', 'wav']:
+            test_path = f"{clean_title}.{ext}"
+            if os.path.exists(test_path):
+                found_file = test_path
+                break
+
+        # 5. Если нашли — переименовываем в mp3, шлем в канал и удаляем с сервера
+        if found_file:
+            final_mp3 = f"{clean_title}.mp3"
+            if found_file != final_mp3:
+                os.rename(found_file, final_mp3)
+                
+            audio_file = types.FSInputFile(final_mp3)
+            
+            # Отправляем аудиофайл прямо в канал
+            await bot.send_audio(
+                chat_id=CHANNEL_ID,
+                audio=audio_file, 
+                title=title, 
+                performer=uploader
+            )
+            os.remove(final_mp3)
+    except Exception as e:
+        print(f"Ошибка внутри download_and_send_single_track: {e}")
+
+# Главная точка входа для удержания бота в сети
+async def main():
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
