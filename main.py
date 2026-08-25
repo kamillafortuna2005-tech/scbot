@@ -1,6 +1,7 @@
 import asyncio
 import os
 import re
+import shutil
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from yt_dlp import YoutubeDL
@@ -12,11 +13,11 @@ dp = Dispatcher()
 
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
-    await message.answer("Привет! Отправь мне ссылку на трек, альбом или плейлист SoundCloud, и я опубликую его в твой паблик.")
+    await message.answer("Привет! Отправь мне ссылку на трек или альбом SoundCloud, и я опубликую его в твой паблик одной группой.")
 
 @dp.message()
 async def download_soundcloud(message: types.Message):
-    # 1. Находим ссылку в сообщении пользователя
+    # 1. Находим и очищаем ссылку
     match = re.search(r'(https?://(?:on\.)?soundcloud\.com/[^\s]+)', message.text)
     if not match:
         await message.answer("Пожалуйста, отправьте корректную ссылку на SoundCloud.")
@@ -26,106 +27,117 @@ async def download_soundcloud(message: types.Message):
     clean_url = re.sub(r'[а-яА-Я]+$', '', raw_url)
     post_text = message.text.replace(raw_url, clean_url)
 
-    status_message = await message.answer("Анализирую ссылку и начинаю скачивание...")
+    status_message = await message.answer("Анализирую релиз и начинаю скачивание...")
 
-    # Базовые настройки для извлечения инфо (включаем сбор данных о плейлистах)
     ydl_opts = {
         'format': 'bestaudio/best',
         'quiet': True,
-        'extract_flat': 'in_playlist',  # Позволяет быстро понять, плейлист это или трек
+        'extract_flat': 'in_playlist',
     }
+
+    # Создаем уникальную временную папку для сбора треков этого деплоя/запроса
+    session_dir = f"download_{message.message_id}"
+    os.makedirs(session_dir, exist_ok=True)
 
     try:
         loop = asyncio.get_event_loop()
         
-        # 2. Сначала отправляем очищенный текст/ссылку в твой канал
-        await bot.send_message(chat_id=CHANNEL_ID, text=post_text)
-        
-        # 3. Извлекаем информацию о ссылке
         with YoutubeDL(ydl_opts) as ydl:
             info = await loop.run_in_executor(None, lambda: ydl.extract_info(clean_url, download=False))
         
-        # Проверяем, является ли ссылка альбомом/плейлистом
+        media_batch = []  # Список для собранных треков
+
+        # 2. Собираем треки (плейлист или сингл)
         if 'entries' in info:
-            # Это альбом или плейлист!
             tracks = list(info['entries'])
-            await status_message.edit_text(f"Обнаружен альбом/плейлист! Найдено треков: {len(tracks)}. Начинаю загрузку...")
+            await status_message.edit_text(f"Обнаружен альбом! Найдено треков: {len(tracks)}. Скачиваю на сервер...")
             
-            # Перебираем каждый трек в альбоме по очереди
             for index, track_entry in enumerate(tracks, start=1):
                 track_url = track_entry.get('url') or track_entry.get('webpage_url')
                 if not track_url:
                     continue
-                
-                await status_message.edit_text(f"Скачиваю трек {index} из {len(tracks)}...")
-                await download_and_send_single_track(track_url, loop)
-                
-            await status_message.edit_text("✅ Все треки из альбома успешно опубликованы!")
+                await status_message.edit_text(f"Загрузка на сервер: трек {index} из {len(tracks)}...")
+                file_info = await download_single_file(track_url, loop, session_dir)
+                if file_info:
+                    media_batch.append(file_info)
         else:
-            # Это одиночный трек!
-            await status_message.edit_text("Скачиваю трек...")
-            await download_and_send_single_track(clean_url, loop)
-            await status_message.delete()
-            
-    except Exception as e:
-        print(f"Ошибка при обработке: {e}")
-        await status_message.edit_text("❌ Произошла ошибка при обработке ссылки.")
+            await status_message.edit_text("Скачиваю сингл на сервер...")
+            file_info = await download_single_file(clean_url, loop, session_dir)
+            if file_info:
+                media_batch.append(file_info)
 
-# Логика скачивания и отправки одного конкретного трека
-async def download_and_send_single_track(url, loop):
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'quiet': True
-    }
+        # 3. Публикация, если файлы успешно скачались
+        if media_batch:
+            await status_message.edit_text("Все файлы на сервере. Начинаю публикацию...")
+            
+            # Сначала отправляем текстовую ссылку
+            await bot.send_message(chat_id=CHANNEL_ID, text=post_text)
+            
+            # Нарезаем массив треков на группы максимум по 10 штук (лимит Telegram)
+            for i in range(0, len(media_batch), 10):
+                chunk = media_batch[i:i+10]
+                media_group = []
+                
+                for item in chunk:
+                    audio_file = types.FSInputFile(item['path'])
+                    media_group.append(
+                        types.InputMediaAudio(
+                            media=audio_file,
+                            title=item['title'],
+                            performer=item['performer']
+                        )
+                    )
+                
+                # Отправляем пачку треков ОДНИМ сообщением
+                await bot.send_media_group(chat_id=CHANNEL_ID, media=media_group)
+                await asyncio.sleep(1)  # Защита от флуд-фильтра Telegram
+            
+            await status_message.edit_text("✅ Альбом успешно опубликован в одном сообщении!")
+        else:
+            await status_message.edit_text("❌ Не удалось скачать ни одного трека.")
+
+    except Exception as e:
+        print(f"Ошибка при обработке релиза: {e}")
+        await status_message.edit_text("❌ Произошла ошибка при обработке ссылки.")
     
+    finally:
+        # Полностью вычищаем за собой временную папку с аудиофайлами
+        if os.path.exists(session_dir):
+            shutil.rmtree(session_dir)
+
+# Вспомогательная функция для скачивания файла во временную папку
+async def download_single_file(url, loop, save_dir):
+    ydl_opts = {'format': 'bestaudio/best', 'quiet': True}
     try:
-        # 1. Получаем инфо о конкретном треке
         with YoutubeDL(ydl_opts) as ydl:
             info = await loop.run_in_executor(None, lambda: ydl.extract_info(url, download=False))
             title = info.get('title', 'Unknown Track')
             uploader = info.get('uploader', 'Unknown Artist')
 
-        # 2. Формируем имя файла
         clean_title = re.sub(r'[\\/*?:"<>|]', "", f"{uploader} - {title}")
         
+        # Сохраняем строго во временную сессионную папку
         download_opts = {
             'format': 'bestaudio/best',
-            'outtmpl': f"{clean_title}.%(ext)s",
+            'outtmpl': os.path.join(save_dir, f"{clean_title}.%(ext)s"),
             'quiet': True
         }
 
-        # 3. Скачиваем
         with YoutubeDL(download_opts) as ydl:
             await loop.run_in_executor(None, lambda: ydl.download([url]))
         
-        # 4. Ищем скачанный файл с любым расширением
-        found_file = None
+        # Находим расширение
         for ext in ['mp3', 'm4a', 'ogg', 'opus', 'wav']:
-            test_path = f"{clean_title}.{ext}"
+            test_path = os.path.join(save_dir, f"{clean_title}.{ext}")
             if os.path.exists(test_path):
-                found_file = test_path
-                break
-
-        # 5. Если нашли — переименовываем в mp3, шлем в канал и удаляем с сервера
-        if found_file:
-            final_mp3 = f"{clean_title}.mp3"
-            if found_file != final_mp3:
-                os.rename(found_file, final_mp3)
-                
-            audio_file = types.FSInputFile(final_mp3)
-            
-            # Отправляем аудиофайл прямо в канал
-            await bot.send_audio(
-                chat_id=CHANNEL_ID,
-                audio=audio_file, 
-                title=title, 
-                performer=uploader
-            )
-            os.remove(final_mp3)
+                final_mp3 = os.path.join(save_dir, f"{clean_title}.mp3")
+                if test_path != final_mp3:
+                    os.rename(test_path, final_mp3)
+                return {'path': final_mp3, 'title': title, 'performer': uploader}
     except Exception as e:
-        print(f"Ошибка внутри download_and_send_single_track: {e}")
+        print(f"Ошибка при скачивании трека {url}: {e}")
+    return None
 
-# Главная точка входа для удержания бота в сети
 async def main():
     await dp.start_polling(bot)
 
