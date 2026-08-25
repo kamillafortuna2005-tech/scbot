@@ -38,7 +38,7 @@ async def download_soundcloud(message: types.Message):
             uploader = info.get ('uploader', 'Unknown Artist')
 
             clean_title = re.sub(r'[\\/*?:"<>|]', "",f"{uploader} - {title}")
-            file_path = f"{clean title}.mp3"
+            file_path = f"{clean_title}.mp3"
 
             ydl.params['outtmlp'] = file_path
 
