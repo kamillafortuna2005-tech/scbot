@@ -60,3 +60,6 @@ async def download_soundcloud(message: types.Message):
         await status_message.edit_text("❌ Произошла ошибка при обработке ссылки. Возможно, трек скрыт или заблокирован.")
 
 async def main():
+    await dp.start_polling(bot)
+if __name__ == "__main__":
+    asyncio.run(main())
