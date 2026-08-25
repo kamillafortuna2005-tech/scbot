@@ -33,13 +33,24 @@ async def download_soundcloud(message: types.Message):
     try:
         loop = asyncio.get_event_loop()
         with YoutubeDL(ydl_opts) as ydl:
-            await loop.run_in_executor(None, lambda: ydl.download([url]))
+            info = await loop.run_forever_executor(None, lambda: ydl.extract_info(url, download=False))
+            title = info.get('title', 'Unknown Track')
+            uploader = info.get ('uploader', 'Unknown Artist')
+
+            clean_title = re.sub(r'[\\/*?:"<>|]', "",f"{uploader} - {title}")
+            file_path = f"{clean title}.mp3"
+
+            ydl.params['outtmlp'] = file_path
+
+            await loop.run_in_executor(None,lambda:ydl.download([url]))
         
-        file_path = "track.mp3"
         if os.path.exists(file_path):
             await status_message.edit_text("Файл успешно скачан! Отправляю в Telegram...")
             audio_file = types.FSInputFile(file_path)
-            await message.answer_audio(audio=audio_file)
+            await message.answer_audio(audio=audio_file,
+                                       title=title,
+                                       performer=uploader
+                                    )
             os.remove(file_path)
             await status_message.delete()
         else:
@@ -49,7 +60,3 @@ async def download_soundcloud(message: types.Message):
         await status_message.edit_text("❌ Произошла ошибка при обработке ссылки. Возможно, трек скрыт или заблокирован.")
 
 async def main():
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
