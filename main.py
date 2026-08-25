@@ -38,15 +38,23 @@ async def download_soundcloud(message: types.Message):
             uploader = info.get ('uploader', 'Unknown Artist')
 
             clean_title = re.sub(r'[\\/*?:"<>|]', "",f"{uploader} - {title}")
-            file_path = f"{clean_title}.mp3"
-
-            ydl.params['outtmlp'] = file_path
+            ydl.params['outtmlp'] = f"{clean_title}.%(ext)s"
 
             await loop.run_in_executor(None,lambda:ydl.download([url]))
-        
-        if os.path.exists(file_path):
+
+        found_file = None
+        for ext in ['mp3', 'm4a', 'ogg', 'opus', 'wav']:
+            test_path = f"{clean_title}.{ext}"    
+            if os.path.exists(test_path):
+                found_file = test_path
+                break
+        if found_file:
+            final_mp3 = f"{clean_title}.mp3"
+            if found_file != final.mp3:
+                os.rename(found_file, final_mp3)
+
             await status_message.edit_text("Файл успешно скачан! Отправляю в Telegram...")
-            audio_file = types.FSInputFile(file_path)
+            audio_file = types.FSInputFile(final_mp3)
             await message.answer_audio(audio=audio_file,
                                        title=title,
                                        performer=uploader
