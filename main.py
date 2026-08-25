@@ -26,12 +26,7 @@ async def download_soundcloud(message: types.Message):
 
     ydl_opts = {
         'format': 'bestaudio/best',
-        'outtmpl': 'track.%(ext)s',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
+        'outtmpl': 'track.mp3',
         'quiet': True
     }
 
