@@ -7,7 +7,7 @@ from aiogram.filters import CommandStart
 from yt_dlp import YoutubeDL
 
 TOKEN = "8867316822:AAFaa_bFHywtu1UqRwCTGHoK78ljlr-Kfrg"
-CHANNEL_ID = "@musicCEO228"  # Юзернейм твоего паблика
+CHANNEL_ID = "@percshawty"  # Юзернейм твоего паблика
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
@@ -35,7 +35,7 @@ async def download_soundcloud(message: types.Message):
         'extract_flat': 'in_playlist',
     }
 
-    # Создаем уникальную временную папку для сбора треков этого деплоя/запроса
+    # Создаем уникальную временную папку для сбора треков этого запроса
     session_dir = f"download_{message.message_id}"
     os.makedirs(session_dir, exist_ok=True)
 
@@ -138,7 +138,10 @@ async def download_single_file(url, loop, save_dir):
         print(f"Ошибка при скачивании трека {url}: {e}")
     return None
 
+# Главная точка входа
 async def main():
+    # ЖЕСТКИЙ СБРОС ВЕБХУКОВ И СТАРЫХ ЗАПРОСОВ ПРИ КАЖДОМ СТАРТЕ
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
